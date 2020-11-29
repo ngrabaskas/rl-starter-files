@@ -10,6 +10,10 @@ import sys
 import utils
 from model import ACModel
 
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.preprocessing import normalize
+
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -157,16 +161,47 @@ def main():
     num_frames = status["num_frames"]
     update = status["update"]
     start_time = time.time()
+    
+    fig, axs = plt.subplots(1,3)
+    fig.suptitle('Convolution Layer Weights Normalized Difference')
 
     while num_frames < args.frames:
             
-        # Update model parameters
+        # Store copies of s_t model params
+        
+        old_parameters = {}
+        for name, param in acmodel.named_parameters():
+            old_parameters[name] = param.detach().numpy().copy()
 
+        # Update model parameters
         update_start_time = time.time()
         exps, logs1 = algo.collect_experiences()
         logs2 = algo.update_parameters(exps)
         logs = {**logs1, **logs2}
         update_end_time = time.time()
+        
+        # Store copies of s_t+1 model params
+        new_parameters = {}
+        for name, param in acmodel.named_parameters():
+            new_parameters[name] = param.detach().numpy().copy()
+        
+        # Compute L2 Norm of model state differences
+        # Print model weight change visualization
+        for index in range(len(old_parameters.keys())):
+            if index == 0 or index == 2 or index == 4:
+                key = list(old_parameters.keys())[index]
+                old_weights = old_parameters[key]
+                new_weights = new_parameters[key]
+                norm_diff = numpy.linalg.norm(new_weights - old_weights)
+                print(key + " diff       \t", norm_diff)
+                diff_matrix = abs(new_weights - old_weights)
+                diff_matrix[:,:,0,0] = normalize(diff_matrix[:,:,0,0], norm='max', axis=0)
+                axs[int(index / 2)].imshow(diff_matrix[:,:,0,0], cmap='Greens', interpolation='nearest')
+          
+        # This allows the plots to update as the model trains
+        plt.ion()
+        plt.show()
+        plt.pause(0.001)
 
         num_frames += logs["num_frames"]
         update += 1
