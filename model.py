@@ -80,6 +80,7 @@ class ACModel(nn.Module, torch_ac.RecurrentACModel):
 
     def forward(self, obs, memory):
         x = obs.image.transpose(1, 3).transpose(2, 3)
+#        print("Foward Img Conv Size Input", x.shape)
         x = self.image_conv(x)
         x = x.reshape(x.shape[0], -1)
 

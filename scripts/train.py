@@ -25,7 +25,7 @@ def main():
 
     ## General parameters
     parser.add_argument("--algo", required=True,
-                        help="algorithm to use: a2c | ppo | ppo_intrinsic (REQUIRED)")
+                        help="algorithm to use: a2c | ppo | ppo_intrinsic | a2c_intrinsic (REQUIRED)")
     parser.add_argument("--env", required=True,
                         help="name of the environment to train on (REQUIRED)")
     parser.add_argument("--model", default=None,
@@ -149,6 +149,11 @@ def main():
         algo = torch_ac.PPOAlgoIntrinsic(envs, acmodel, device, args.frames_per_proc, args.discount, args.lr, args.gae_lambda,
                                 args.entropy_coef, args.value_loss_coef, args.max_grad_norm, args.recurrence,
                                 args.optim_eps, args.clip_eps, args.epochs, args.batch_size, preprocess_obss)
+    elif args.algo == "a2c_intrinsic":
+        algo = torch_ac.A2CAlgoIntrinsic(envs, acmodel, device, args.frames_per_proc, args.discount, args.lr, args.gae_lambda,
+                                args.entropy_coef, args.value_loss_coef, args.max_grad_norm, args.recurrence,
+                                args.optim_alpha, args.optim_eps, preprocess_obss)
+        
     else:
         raise ValueError("Incorrect algorithm name: {}".format(args.algo))
 
@@ -162,8 +167,10 @@ def main():
     update = status["update"]
     start_time = time.time()
     
-    fig, axs = plt.subplots(1,3)
-    fig.suptitle('Convolution Layer Weights Normalized Difference')
+    print_visual = False
+    if print_visual:
+        fig, axs = plt.subplots(1,3)
+        fig.suptitle('Convolution Layer Weights Normalized Difference')
 
     while num_frames < args.frames:
             
@@ -193,15 +200,16 @@ def main():
                 old_weights = old_parameters[key]
                 new_weights = new_parameters[key]
                 norm_diff = numpy.linalg.norm(new_weights - old_weights)
-                print(key + " diff       \t", norm_diff)
                 diff_matrix = abs(new_weights - old_weights)
                 diff_matrix[:,:,0,0] = normalize(diff_matrix[:,:,0,0], norm='max', axis=0)
-                axs[int(index / 2)].imshow(diff_matrix[:,:,0,0], cmap='Greens', interpolation='nearest')
+                if print_visual:
+                    axs[int(index / 2)].imshow(diff_matrix[:,:,0,0], cmap='Greens', interpolation='nearest')
           
         # This allows the plots to update as the model trains
-        plt.ion()
-        plt.show()
-        plt.pause(0.001)
+        if print_visual:
+            plt.ion()
+            plt.show()
+            plt.pause(0.001)
 
         num_frames += logs["num_frames"]
         update += 1
