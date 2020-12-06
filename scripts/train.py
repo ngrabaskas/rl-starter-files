@@ -70,6 +70,9 @@ def main():
                         help="number of time-steps gradient is backpropagated (default: 1). If > 1, a LSTM is added to the model to have memory.")
     parser.add_argument("--text", action="store_true", default=False,
                         help="add a GRU to the model to handle text input")
+                        
+    parser.add_argument("--visualize", default=False,
+                        help="show real time CNN layer weight changes")
 
     args = parser.parse_args()
 
@@ -167,7 +170,7 @@ def main():
     update = status["update"]
     start_time = time.time()
     
-    print_visual = False
+    print_visual = args.visualize
     if print_visual:
         fig, axs = plt.subplots(1,3)
         fig.suptitle('Convolution Layer Weights Normalized Difference')
