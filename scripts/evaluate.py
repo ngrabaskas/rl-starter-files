@@ -114,15 +114,17 @@ def main():
                 logs["num_frames_per_episode"].append(log_episode_num_frames[i].item())
                 
                 if args.visualize:
-                    img_sum = img_sum / (img_count / 4)
-                    obss_sum = obss_sum / img_count
-                    encoding_sum = encoding_sum / img_count
-                    filepath = args.save_path + '_image.jpg'
+                    img_sum = img_sum / (img_count)
+#                    obss_sum = obss_sum / img_count
+#                    encoding_sum = encoding_sum / img_count
+                    filepath = args.save_path + '_image_' + str(log_done_counter - 1) + '.jpg'
                     imsave(filepath, img_sum)
-                    filepath = args.save_path + '_observation.jpg'
-                    imsave(filepath, obss_sum)
-                    filepath = args.save_path + '_environment.jpg'
-                    imsave(filepath, encoding_sum)
+                    img_sum = None
+                    img_count = 0
+#                    filepath = args.save_path + '_observation.jpg'
+#                    imsave(filepath, obss_sum)
+#                    filepath = args.save_path + '_environment.jpg'
+#                    imsave(filepath, encoding_sum)
 
         mask = 1 - torch.tensor(dones, device=device, dtype=torch.float)
         log_episode_return *= mask
