@@ -3,6 +3,7 @@ import time
 import torch
 from torch_ac.utils.penv import ParallelEnv
 from skimage.io import imsave
+import numpy
 
 import utils
 
@@ -75,7 +76,7 @@ def main():
     log_episode_return = torch.zeros(args.procs, device=device)
     log_episode_num_frames = torch.zeros(args.procs, device=device)
     
-    img_sum = None
+    img_sum = []
     obss_sum = None
     encoding_sum = None
     img_count = 0
@@ -97,15 +98,15 @@ def main():
             highlight_mask=None
         )
         encoding = state.grid.encode()
-        img_count += 1
-        if img_count == 1:
-            img_sum = img
-            obss_sum = obss[0]['image']
-            encoding_sum = encoding
-        else:
-            img_sum += img
-            obss_sum += obss[0]['image']
-            encoding_sum += encoding
+#        img_count += 1
+#        if img_count == 1:
+#            img_sum = img
+##            obss_sum = obss[0]['image']
+##            encoding_sum = encoding
+#        else:
+#            img_sum += img
+##            obss_sum += obss[0]['image']
+##            encoding_sum += encoding
 
         for i, done in enumerate(dones):
             if done:
@@ -114,17 +115,21 @@ def main():
                 logs["num_frames_per_episode"].append(log_episode_num_frames[i].item())
                 
                 if args.visualize:
-                    img_sum = img_sum / (img_count)
-#                    obss_sum = obss_sum / img_count
-#                    encoding_sum = encoding_sum / img_count
-                    filepath = args.save_path + '_image_' + str(log_done_counter - 1) + '.jpg'
-                    imsave(filepath, img_sum)
-                    img_sum = None
-                    img_count = 0
-#                    filepath = args.save_path + '_observation.jpg'
-#                    imsave(filepath, obss_sum)
-#                    filepath = args.save_path + '_environment.jpg'
-#                    imsave(filepath, encoding_sum)
+                    if len(img_sum) > 0:
+                        img_sum = img_sum / img_count
+                        img_sum = img_sum.astype(numpy.uint8)
+                        filepath = args.save_path + '_image_' + str(log_done_counter - 1) + '.jpg'
+                        imsave(filepath, img_sum)
+                        img_sum = []
+                        img_count = 0
+            else:
+                img_count += 1
+                if img_count == 1:
+                    img_sum = img.astype(float)
+                else:
+                    img_sum += img
+                
+
 
         mask = 1 - torch.tensor(dones, device=device, dtype=torch.float)
         log_episode_return *= mask
