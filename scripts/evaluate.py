@@ -2,6 +2,8 @@ import argparse
 import time
 import torch
 from torch_ac.utils.penv import ParallelEnv
+from skimage.io import imsave
+import numpy
 
 import utils
 
@@ -28,6 +30,10 @@ def main():
                         help="add a LSTM to the model")
     parser.add_argument("--text", action="store_true", default=False,
                         help="add a GRU to the model")
+    parser.add_argument("--visualize", default=False,
+                        help="print stuff")
+    parser.add_argument("--save_path", default="test_image",
+                        help="save path for agent visualizations")
     args = parser.parse_args()
 
     # Set seed for all randomness sources
@@ -69,20 +75,61 @@ def main():
     log_done_counter = 0
     log_episode_return = torch.zeros(args.procs, device=device)
     log_episode_num_frames = torch.zeros(args.procs, device=device)
+    
+    img_sum = []
+    obss_sum = None
+    encoding_sum = None
+    img_count = 0
 
     while log_done_counter < args.episodes:
         actions = agent.get_actions(obss)
         obss, rewards, dones, _ = env.step(actions)
+        
         agent.analyze_feedbacks(rewards, dones)
 
         log_episode_return += torch.tensor(rewards, device=device, dtype=torch.float)
         log_episode_num_frames += torch.ones(args.procs, device=device)
+        
+        state = env.get_environment_state()
+        img = state.grid.render(
+            32,
+            state.agent_pos,
+            state.agent_dir,
+            highlight_mask=None
+        )
+        encoding = state.grid.encode()
+#        img_count += 1
+#        if img_count == 1:
+#            img_sum = img
+##            obss_sum = obss[0]['image']
+##            encoding_sum = encoding
+#        else:
+#            img_sum += img
+##            obss_sum += obss[0]['image']
+##            encoding_sum += encoding
 
         for i, done in enumerate(dones):
             if done:
                 log_done_counter += 1
                 logs["return_per_episode"].append(log_episode_return[i].item())
                 logs["num_frames_per_episode"].append(log_episode_num_frames[i].item())
+                
+                if args.visualize:
+                    if len(img_sum) > 0:
+                        img_sum = img_sum / img_count
+#                        img_sum = img_sum.astype(numpy.uint8)
+                        filepath = args.save_path + '_image_' + str(log_done_counter - 1) + '.jpg'
+                        imsave(filepath, img_sum)
+                        img_sum = []
+                        img_count = 0
+            else:
+                img_count += 1
+                if img_count == 1:
+                    img_sum = img #.astype(float)
+                else:
+                    img_sum += img
+                
+
 
         mask = 1 - torch.tensor(dones, device=device, dtype=torch.float)
         log_episode_return *= mask

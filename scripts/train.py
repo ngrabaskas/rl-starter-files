@@ -10,6 +10,10 @@ import sys
 import utils
 from model import ACModel
 
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.preprocessing import normalize
+
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
@@ -21,7 +25,7 @@ def main():
 
     ## General parameters
     parser.add_argument("--algo", required=True,
-                        help="algorithm to use: a2c | ppo | ppo_intrinsic (REQUIRED)")
+                        help="algorithm to use: a2c | ppo | ppo_intrinsic | a2c_intrinsic (REQUIRED)")
     parser.add_argument("--env", required=True,
                         help="name of the environment to train on (REQUIRED)")
     parser.add_argument("--model", default=None,
@@ -66,6 +70,9 @@ def main():
                         help="number of time-steps gradient is backpropagated (default: 1). If > 1, a LSTM is added to the model to have memory.")
     parser.add_argument("--text", action="store_true", default=False,
                         help="add a GRU to the model to handle text input")
+                        
+    parser.add_argument("--visualize", default=False,
+                        help="show real time CNN layer weight changes")
 
     args = parser.parse_args()
 
@@ -145,6 +152,11 @@ def main():
         algo = torch_ac.PPOAlgoIntrinsic(envs, acmodel, device, args.frames_per_proc, args.discount, args.lr, args.gae_lambda,
                                 args.entropy_coef, args.value_loss_coef, args.max_grad_norm, args.recurrence,
                                 args.optim_eps, args.clip_eps, args.epochs, args.batch_size, preprocess_obss)
+    elif args.algo == "a2c_intrinsic":
+        algo = torch_ac.A2CAlgoIntrinsic(envs, acmodel, device, args.frames_per_proc, args.discount, args.lr, args.gae_lambda,
+                                args.entropy_coef, args.value_loss_coef, args.max_grad_norm, args.recurrence,
+                                args.optim_alpha, args.optim_eps, preprocess_obss)
+        
     else:
         raise ValueError("Incorrect algorithm name: {}".format(args.algo))
 
@@ -157,16 +169,50 @@ def main():
     num_frames = status["num_frames"]
     update = status["update"]
     start_time = time.time()
+    
+    print_visual = args.visualize
+    if print_visual:
+        fig, axs = plt.subplots(1,3)
+        fig.suptitle('Convolution Layer Weights Normalized Difference')
 
     while num_frames < args.frames:
             
-        # Update model parameters
+        # Store copies of s_t model params
+        
+        old_parameters = {}
+        for name, param in acmodel.named_parameters():
+            old_parameters[name] = param.detach().numpy().copy()
 
+        # Update model parameters
         update_start_time = time.time()
         exps, logs1 = algo.collect_experiences()
         logs2 = algo.update_parameters(exps)
         logs = {**logs1, **logs2}
         update_end_time = time.time()
+        
+        # Store copies of s_t+1 model params
+        new_parameters = {}
+        for name, param in acmodel.named_parameters():
+            new_parameters[name] = param.detach().numpy().copy()
+        
+        # Compute L2 Norm of model state differences
+        # Print model weight change visualization
+        for index in range(len(old_parameters.keys())):
+            if index == 0 or index == 2 or index == 4:
+                key = list(old_parameters.keys())[index]
+                old_weights = old_parameters[key]
+                new_weights = new_parameters[key]
+                norm_diff = numpy.linalg.norm(new_weights - old_weights)
+                diff_matrix = abs(new_weights - old_weights)
+                diff_matrix[:,:,0,0] = normalize(diff_matrix[:,:,0,0], norm='max', axis=0)
+                if print_visual:
+                    axs[int(index / 2)].imshow(diff_matrix[:,:,0,0], cmap='Greens', interpolation='nearest')
+          
+        # This allows the plots to update as the model trains
+        if print_visual:
+            plt.ion()
+            plt.show()
+            plt.pause(0.001)
 
         num_frames += logs["num_frames"]
         update += 1
