@@ -117,7 +117,7 @@ def main():
                 if args.visualize:
                     if len(img_sum) > 0:
                         img_sum = img_sum / img_count
-                        img_sum = img_sum.astype(numpy.uint8)
+#                        img_sum = img_sum.astype(numpy.uint8)
                         filepath = args.save_path + '_image_' + str(log_done_counter - 1) + '.jpg'
                         imsave(filepath, img_sum)
                         img_sum = []
@@ -125,7 +125,7 @@ def main():
             else:
                 img_count += 1
                 if img_count == 1:
-                    img_sum = img.astype(float)
+                    img_sum = img #.astype(float)
                 else:
                     img_sum += img
                 
